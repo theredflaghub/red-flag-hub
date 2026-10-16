@@ -1,0 +1,1301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>The Red Flag Hub - Dating Safety & Verification PWA</title>
+    <!-- Web App Manifest for PWA Support -->
+    <link rel="manifest" href="data:application/manifest+json;base64,ewogICJuYW1lIjogIlRoZSBSZWQgRmxhZyBIdWIiLAogICJzaG9ydF9uYW1lIjogIlJlZEZsYWdIdWIiLAogICJzdGFydF91cmwiOiAiLiIsCiAgImRpc3BsYXkiOiAic3RhbmRhbG9uZSIsCiAgImJhY2tncm91bmRfY29sb3IiOiAiIzBmMGYxM3AiLAogICJ0aGVtZV9jb2xvciI6ICIjZmYzYjVjIiwKICAiaWNvbnMiOiBbXQp9">
+    <meta name="theme-color" content="#ff3b5c">
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Leaflet CSS for Interactive Venue Map -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        darkBg: '#090a0f',
+                        cardBg: '#13141f',
+                        cardHover: '#1c1d2d',
+                        crimson: '#ff3b5c',
+                        crimsonDark: '#991b1b',
+                        greenFlag: '#10b981',
+                        greenFlagDark: '#047857',
+                        textMuted: '#9ca3af'
+                    },
+                    boxShadow: {
+                        'glow-red': '0 0 25px -5px rgba(255, 59, 92, 0.4)',
+                        'glow-green': '0 0 25px -5px rgba(16, 185, 129, 0.4)'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background-color: #090a0f;
+            color: #f3f4f6;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #090a0f; }
+        ::-webkit-scrollbar-thumb { background: #1f2937; border-radius: 4px; }
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        @keyframes sosPulse {
+            0% { box-shadow: 0 0 0 0 rgba(255, 59, 92, 0.8); }
+            70% { box-shadow: 0 0 0 18px rgba(255, 59, 92, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(255, 59, 92, 0); }
+        }
+        .sos-active { animation: sosPulse 1.8s infinite; }
+        
+        @keyframes phoneRing {
+            0% { transform: scale(1) rotate(0deg); }
+            10% { transform: scale(1.05) rotate(12deg); }
+            20% { transform: scale(1.05) rotate(-12deg); }
+            30% { transform: scale(1.05) rotate(12deg); }
+            40% { transform: scale(1) rotate(0deg); }
+            100% { transform: scale(1) rotate(0deg); }
+        }
+        .ring-anim { animation: phoneRing 0.9s infinite; }
+        #safeMap { height: 320px; border-radius: 16px; z-index: 10; filter: contrast(105%); }
+
+        .red-flag-card {
+            border-left: 4px solid #ff3b5c !important;
+            background: linear-gradient(135deg, rgba(255, 59, 92, 0.08) 0%, rgba(19, 20, 31, 0.95) 100%);
+        }
+        .green-flag-card {
+            border-left: 4px solid #10b981 !important;
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(19, 20, 31, 0.95) 100%);
+        }
+        .glass-panel {
+            background: rgba(19, 20, 31, 0.75);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col pb-20 md:pb-0 selection:bg-crimson selection:text-white">
+
+    <!-- Top Navigation Header -->
+    <header class="sticky top-0 z-40 bg-[#090a0f]/90 backdrop-blur-md border-b border-gray-800/80 px-4 py-3 flex items-center justify-between">
+        <div class="flex items-center space-x-3">
+            <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-crimson to-rose-400 flex items-center justify-center font-bold text-white shadow-lg shadow-crimson/30">
+                🚩
+            </div>
+            <div>
+                <h1 class="font-extrabold text-lg tracking-tight text-white flex items-center gap-2">
+                    Red Flag Hub
+                    <span class="text-[10px] bg-gradient-to-r from-amber-500 to-amber-700 text-white px-2 py-0.5 rounded-full font-bold uppercase tracking-wider shadow">PRO v2.5</span>
+                </h1>
+            </div>
+        </div>
+        <div class="flex items-center space-x-2">
+            <button onclick="openModal('hotlinesModal')" class="text-xs bg-red-950/60 text-red-300 border border-red-700/60 hover:bg-red-900/80 px-3 py-1.5 rounded-xl font-bold flex items-center gap-1.5 transition">
+                🚨 Helplines
+            </button>
+            <button onclick="openModal('takedownModal')" class="text-xs text-gray-400 hover:text-white px-2.5 py-1.5 rounded-xl bg-gray-900/80 border border-gray-800 transition">
+                Takedown / Legal
+            </button>
+        </div>
+    </header>
+
+    <!-- PWA Install Banner -->
+    <div id="pwaBanner" class="bg-gradient-to-r from-crimsonDark via-red-950 to-gray-950 border-b border-crimson/30 p-3 px-4 flex items-center justify-between text-xs text-white">
+        <div class="flex items-center space-x-2">
+            <span class="text-base animate-bounce">📱</span>
+            <span>Add <b>The Red Flag Hub</b> to your home screen for instant 1-tap date safety.</span>
+        </div>
+        <div class="flex items-center space-x-2">
+            <button onclick="dismissBanner()" class="text-gray-400 hover:text-white px-1">✕</button>
+            <button onclick="installPWA()" class="bg-white text-darkBg font-bold px-3 py-1 rounded-full text-xs hover:bg-gray-200 transition shadow">Install</button>
+        </div>
+    </div>
+
+    <!-- Main Content Container -->
+    <main class="flex-1 max-w-6xl w-full mx-auto p-3 md:p-5 space-y-5">
+
+        <!-- Desktop Navigation Tabs -->
+        <div class="hidden md:flex space-x-1 mb-2 bg-cardBg p-1.5 rounded-2xl border border-gray-800/80 glass-panel">
+            <button onclick="switchTab('feed')" id="dtab-feed" class="tab-btn-d flex-1 py-2.5 rounded-xl text-xs font-bold transition-all bg-crimson text-white shadow-lg shadow-crimson/20">Pattern Feed</button>
+            <button onclick="switchTab('ai')" id="dtab-ai" class="tab-btn-d flex-1 py-2.5 rounded-xl text-xs font-bold transition-all text-gray-400 hover:text-white">🤖 AI Scanner</button>
+            <button onclick="switchTab('sos')" id="dtab-sos" class="tab-btn-d flex-1 py-2.5 rounded-xl text-xs font-bold transition-all text-gray-400 hover:text-white">🚨 SOS Timer</button>
+            <button onclick="switchTab('fakecall')" id="dtab-fakecall" class="tab-btn-d flex-1 py-2.5 rounded-xl text-xs font-bold transition-all text-gray-400 hover:text-white">📞 Fake Call</button>
+            <button onclick="switchTab('map')" id="dtab-map" class="tab-btn-d flex-1 py-2.5 rounded-xl text-xs font-bold transition-all text-gray-400 hover:text-white">📍 Safe Spots</button>
+            <button onclick="switchTab('verifier')" id="dtab-verifier" class="tab-btn-d flex-1 py-2.5 rounded-xl text-xs font-bold transition-all text-gray-400 hover:text-white">Match Verifier</button>
+            <button onclick="switchTab('quiz')" id="dtab-quiz" class="tab-btn-d flex-1 py-2.5 rounded-xl text-xs font-bold transition-all text-gray-400 hover:text-white">Safety Quiz</button>
+            <button onclick="switchTab('qa')" id="dtab-qa" class="tab-btn-d flex-1 py-2.5 rounded-xl text-xs font-bold transition-all text-gray-400 hover:text-white">Q&A Board</button>
+        </div>
+
+        <!-- TAB 1: PATTERN FEED & SEARCH -->
+        <section id="tab-feed" class="tab-content space-y-4">
+            
+            <!-- Red Flag Analytics & Spotlight Bar -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div class="bg-gradient-to-br from-red-950/80 via-cardBg to-cardBg border border-red-800/40 rounded-2xl p-4 flex flex-col justify-between shadow-xl">
+                    <div class="flex justify-between items-center">
+                        <span class="text-[10px] font-black text-red-400 uppercase tracking-widest flex items-center gap-1">
+                            <span class="w-2 h-2 rounded-full bg-crimson animate-ping"></span> Trending Scam Pattern
+                        </span>
+                        <span class="text-[10px] bg-red-900/60 text-red-300 px-2 py-0.5 rounded-full font-bold">Top Alert</span>
+                    </div>
+                    <div class="mt-3">
+                        <h3 class="text-sm font-extrabold text-white">"Bank Glitch / Ride Emergency" Scams</h3>
+                        <p class="text-[11px] text-gray-300 mt-1">Reported +42% this week across major dating apps in metro regions.</p>
+                    </div>
+                </div>
+
+                <div class="bg-cardBg border border-gray-800/80 rounded-2xl p-4 flex items-center justify-between shadow-xl glass-panel">
+                    <div>
+                        <div class="text-[10px] text-gray-400 uppercase font-bold tracking-wider">Community Protection</div>
+                        <div class="text-xl font-black text-crimson mt-0.5">1,480+ Reports Logged</div>
+                        <p class="text-[11px] text-gray-400">Crowdsourced date safety verification.</p>
+                    </div>
+                    <div class="w-12 h-12 rounded-2xl bg-crimson/10 border border-crimson/20 flex items-center justify-center text-2xl">
+                        🛡️
+                    </div>
+                </div>
+
+                <div class="bg-cardBg border border-gray-800/80 rounded-2xl p-4 flex items-center justify-between shadow-xl glass-panel">
+                    <div class="w-full">
+                        <div class="text-[10px] text-gray-400 uppercase font-bold tracking-wider mb-2">Frequent Warning Tags</div>
+                        <div class="flex flex-wrap gap-1.5">
+                            <button onclick="quickFilterTag('Financial Catfish')" class="text-[10px] bg-red-950/60 text-red-300 border border-red-800/60 hover:bg-red-900/60 px-2.5 py-1 rounded-lg font-medium transition">#FinancialCatfish</button>
+                            <button onclick="quickFilterTag('Love Bombing')" class="text-[10px] bg-red-950/60 text-red-300 border border-red-800/60 hover:bg-red-900/60 px-2.5 py-1 rounded-lg font-medium transition">#LoveBombing</button>
+                            <button onclick="quickFilterTag('Boundary Pusher')" class="text-[10px] bg-red-950/60 text-red-300 border border-red-800/60 hover:bg-red-900/60 px-2.5 py-1 rounded-lg font-medium transition">#BoundaryPusher</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-cardBg border border-gray-800/80 rounded-2xl p-4 shadow-xl space-y-4 glass-panel">
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
+                    <div>
+                        <h2 class="text-lg font-bold flex items-center gap-2 text-white">
+                            <span>🔍 Anonymous Date Experiences & Pattern Search</span>
+                        </h2>
+                        <p class="text-xs text-gray-400">Search sanitized stories, flag repeat behavior, and vote on community warnings.</p>
+                    </div>
+                    <button onclick="openModal('shareModal')" class="w-full md:w-auto bg-gradient-to-r from-crimson to-rose-600 hover:from-crimsonDark hover:to-rose-800 text-white px-4 py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition shadow-lg shadow-crimson/30">
+                        <span>🚩</span> Submit Date Story
+                    </button>
+                </div>
+
+                <div class="grid grid-cols-2 md:grid-cols-5 gap-2 pt-1">
+                    <input type="text" id="filterName" oninput="applyFilters()" placeholder="Initials (e.g. J* D*)..." class="bg-darkBg border border-gray-800 text-xs rounded-xl px-3 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-crimson transition">
+                    <input type="text" id="filterCity" oninput="applyFilters()" placeholder="City / District..." class="bg-darkBg border border-gray-800 text-xs rounded-xl px-3 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-crimson transition">
+                    <select id="filterAge" onchange="applyFilters()" class="bg-darkBg border border-gray-800 text-xs rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-crimson transition">
+                        <option value="">All Age Brackets</option>
+                        <option value="18–24">18–24</option>
+                        <option value="25–29">25–29</option>
+                        <option value="30–34">30–34</option>
+                        <option value="35–39">35–39</option>
+                        <option value="40–49">40–49</option>
+                        <option value="50+">50+</option>
+                    </select>
+                    <select id="filterPlatform" onchange="applyFilters()" class="bg-darkBg border border-gray-800 text-xs rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-crimson transition">
+                        <option value="">All Apps/Platforms</option>
+                        <option value="Tinder">Tinder</option>
+                        <option value="Bumble">Bumble</option>
+                        <option value="Hinge">Hinge</option>
+                        <option value="Instagram">Instagram</option>
+                        <option value="Facebook Dating">Facebook Dating</option>
+                        <option value="Grindr">Grindr</option>
+                        <option value="Other">Other</option>
+                    </select>
+                    <select id="filterType" onchange="applyFilters()" class="col-span-2 md:col-span-1 bg-darkBg border border-gray-800 text-xs rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-crimson transition">
+                        <option value="">All Categories</option>
+                        <option value="Red Flag" selected>🚩 Red Flags Only</option>
+                        <option value="Green Flag">🟢 Green Flags Only</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="bg-gray-900/60 border border-gray-800/80 rounded-xl p-3 text-xs text-gray-400 flex items-center justify-between">
+                <span>🛡️ <b>PII Masking Active:</b> Phone numbers, handles, and full names are automatically redacted.</span>
+                <span id="postCountBadge" class="bg-cardBg text-crimson font-bold px-3 py-1 rounded-full border border-gray-800">0 Stories</span>
+            </div>
+
+            <div id="storiesContainer" class="space-y-3.5">
+                <!-- Cards render dynamically -->
+            </div>
+        </section>
+
+        <!-- TAB 2: AI CHAT LOG ANALYZER -->
+        <section id="tab-ai" class="tab-content hidden space-y-4">
+            <div class="bg-cardBg border border-gray-800/80 rounded-2xl p-5 shadow-xl space-y-4 glass-panel">
+                <div>
+                    <h2 class="text-xl font-bold flex items-center gap-2">
+                        🤖 AI Chat Log & Manipulation Scanner
+                    </h2>
+                    <p class="text-xs text-gray-400 mt-1">Paste suspicious text conversations or match messages to scan for manipulation patterns (love-bombing, financial exploitation, guilt-tripping).</p>
+                </div>
+
+                <div class="space-y-2">
+                    <div class="flex justify-between items-center">
+                        <label class="text-xs font-semibold text-gray-300">Paste Conversation or Snippet:</label>
+                        <button onclick="insertSampleChat()" class="text-xs text-crimson hover:underline font-semibold">Insert Sample Scam Message</button>
+                    </div>
+                    <textarea id="aiInputText" rows="5" class="w-full bg-darkBg border border-gray-800 rounded-xl p-3.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-crimson transition" placeholder="e.g. 'I know we just met yesterday but you're my soulmate. My card is blocked, can you wire $50 for my ride?'"></textarea>
+                </div>
+
+                <button onclick="analyzeChatLog()" class="w-full bg-gradient-to-r from-crimson to-rose-600 hover:from-crimsonDark hover:to-rose-800 text-white font-bold py-3.5 rounded-xl transition shadow-lg shadow-crimson/20 flex items-center justify-center gap-2">
+                    ⚡ Scan & Analyze Text
+                </button>
+            </div>
+
+            <!-- AI Results Box -->
+            <div id="aiResultBox" class="hidden bg-cardBg border border-gray-800/80 rounded-2xl p-5 shadow-xl space-y-4 glass-panel">
+                <div class="flex items-center justify-between border-b border-gray-800 pb-3">
+                    <h3 class="font-bold text-base text-white">Analysis Risk Matrix</h3>
+                    <span id="aiRiskBadge" class="px-3 py-1 rounded-full font-bold text-xs">--</span>
+                </div>
+
+                <div class="w-full bg-darkBg rounded-full h-3.5 border border-gray-800 overflow-hidden p-0.5">
+                    <div id="aiRiskBar" class="h-full bg-gradient-to-r from-amber-500 to-crimson rounded-full transition-all duration-700" style="width: 0%"></div>
+                </div>
+
+                <div class="space-y-2">
+                    <h4 class="text-xs font-bold uppercase tracking-wider text-gray-400">Identified Behavioral Patterns</h4>
+                    <div id="aiDetectedList" class="space-y-2"></div>
+                </div>
+
+                <div class="bg-darkBg border border-gray-800/80 rounded-xl p-4 space-y-2">
+                    <h4 class="text-xs font-bold uppercase tracking-wider text-greenFlag">Recommended De-escalation / Boundary Script</h4>
+                    <p id="aiScriptText" class="text-xs text-gray-300 italic">No message analyzed yet.</p>
+                    <button onclick="copyScript()" class="text-xs text-crimson hover:underline font-bold pt-1 flex items-center gap-1">
+                        📋 Copy Script to Clipboard
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 3: EMERGENCY SOS DATE TIMER -->
+        <section id="tab-sos" class="tab-content hidden space-y-4">
+            <div class="bg-cardBg border border-gray-800/80 rounded-2xl p-5 shadow-xl space-y-5 glass-panel">
+                <div>
+                    <h2 class="text-xl font-bold flex items-center gap-2">
+                        🚨 Date Safety SOS Emergency Timer
+                    </h2>
+                    <p class="text-xs text-gray-400 mt-1">Set a safety countdown before going on your date. If you fail to enter your secret PIN before expiration, auto-SMS and WhatsApp location alerts trigger to your contact.</p>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3 bg-darkBg p-4 rounded-xl border border-gray-800">
+                    <div>
+                        <label class="text-xs text-gray-400 font-medium">Trusted Contact Name</label>
+                        <input type="text" id="sosContactName" placeholder="e.g. Bestie Sarah" class="w-full mt-1 bg-cardBg border border-gray-800 text-xs rounded-lg px-3 py-2 text-white focus:outline-none focus:border-crimson">
+                    </div>
+                    <div>
+                        <label class="text-xs text-gray-400 font-medium">Phone Number</label>
+                        <input type="tel" id="sosContactPhone" placeholder="e.g. +1234567890" class="w-full mt-1 bg-cardBg border border-gray-800 text-xs rounded-lg px-3 py-2 text-white focus:outline-none focus:border-crimson">
+                    </div>
+                    <div>
+                        <label class="text-xs text-gray-400 font-medium">Secret PIN (To Cancel)</label>
+                        <input type="password" maxlength="4" id="sosPin" placeholder="4 digits (e.g. 1234)" class="w-full mt-1 bg-cardBg border border-gray-800 text-xs rounded-lg px-3 py-2 text-white focus:outline-none focus:border-crimson">
+                    </div>
+                </div>
+
+                <div class="text-center space-y-4">
+                    <div id="sosTimerDisplay" class="text-5xl md:text-6xl font-mono font-black tracking-widest text-white py-6 bg-darkBg border border-gray-800/80 rounded-2xl shadow-inner">
+                        00:00:00
+                    </div>
+
+                    <div id="sosTimerControls" class="flex flex-wrap justify-center gap-2">
+                        <button onclick="setSosDuration(15)" class="bg-gray-800/80 hover:bg-gray-700 px-4 py-2 rounded-xl text-xs font-bold text-gray-300 transition">15 Mins</button>
+                        <button onclick="setSosDuration(30)" class="bg-gray-800/80 hover:bg-gray-700 px-4 py-2 rounded-xl text-xs font-bold text-gray-300 transition">30 Mins</button>
+                        <button onclick="setSosDuration(60)" class="bg-gray-800/80 hover:bg-gray-700 px-4 py-2 rounded-xl text-xs font-bold text-gray-300 transition">1 Hour</button>
+                        <button onclick="setSosDuration(120)" class="bg-gray-800/80 hover:bg-gray-700 px-4 py-2 rounded-xl text-xs font-bold text-gray-300 transition">2 Hours</button>
+                    </div>
+
+                    <div class="flex gap-3 pt-2">
+                        <button id="startSosBtn" onclick="startSosTimer()" class="flex-1 bg-gradient-to-r from-greenFlag to-emerald-600 hover:from-greenFlagDark hover:to-emerald-800 text-darkBg font-black py-3.5 rounded-xl transition shadow-lg shadow-greenFlag/20">
+                            ▶ Start Date Protection Timer
+                        </button>
+                        <button id="cancelSosBtn" onclick="promptSosCancel()" class="hidden flex-1 bg-gray-800 hover:bg-gray-700 text-white font-bold py-3.5 rounded-xl transition border border-gray-700">
+                            🔒 Enter PIN to Deactivate
+                        </button>
+                    </div>
+
+                    <div class="pt-2 border-t border-gray-800/80">
+                        <button onclick="triggerImmediateSOS()" class="w-full bg-gradient-to-r from-crimson to-rose-700 hover:from-crimsonDark hover:to-rose-900 text-white font-black py-4 rounded-xl text-sm tracking-wider uppercase shadow-xl sos-active">
+                            🆘 IMMEDIATE SOS ALERT (TRIGGER NOW)
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 4: FAKE CALL RESCUE UTILITY -->
+        <section id="tab-fakecall" class="tab-content hidden space-y-4">
+            <div class="bg-cardBg border border-gray-800/80 rounded-2xl p-5 shadow-xl space-y-4 glass-panel">
+                <div>
+                    <h2 class="text-xl font-bold flex items-center gap-2">
+                        📞 Interactive Fake Call Date Rescue
+                    </h2>
+                    <p class="text-xs text-gray-400 mt-1">Stuck on an uncomfortable date? Trigger a realistic incoming phone call screen with audio voice simulations to excuse yourself gracefully.</p>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="bg-darkBg p-4 rounded-xl border border-gray-800 space-y-3">
+                        <h3 class="text-xs font-bold text-crimson uppercase tracking-wider">Caller Configuration</h3>
+                        <div>
+                            <label class="text-xs text-gray-400">Caller ID Name</label>
+                            <input type="text" id="fakeCallerName" value="Mom / Work Emergency" class="w-full mt-1 bg-cardBg border border-gray-800 text-xs rounded-lg px-3 py-2 text-white">
+                        </div>
+                        <div>
+                            <label class="text-xs text-gray-400">Simulated Call Delay</label>
+                            <select id="fakeCallDelay" class="w-full mt-1 bg-cardBg border border-gray-800 text-xs rounded-lg px-3 py-2 text-white">
+                                <option value="5">In 5 Seconds (Quick Test)</option>
+                                <option value="30">In 30 Seconds</option>
+                                <option value="60">In 1 Minute</option>
+                                <option value="300">In 5 Minutes</option>
+                            </select>
+                        </div>
+                        <button onclick="scheduleFakeCall()" class="w-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-darkBg font-black py-3 rounded-xl transition shadow-lg shadow-amber-500/20">
+                            ⏱️ Schedule Fake Call
+                        </button>
+                    </div>
+
+                    <div class="bg-darkBg p-4 rounded-xl border border-gray-800 space-y-3 text-xs text-gray-300 flex flex-col justify-between">
+                        <div>
+                            <h3 class="text-xs font-bold text-greenFlag uppercase tracking-wider mb-2">How to use seamlessly:</h3>
+                            <ul class="list-disc pl-4 space-y-1.5 text-gray-400">
+                                <li>Set the timer for 30 seconds and place your phone face down.</li>
+                                <li>When it rings, pick up, step outside, and accept the call.</li>
+                                <li>Use the fake audio prompt as an excuse: <i>"I am so sorry, I have an urgent issue at home/office and must head out!"</i></li>
+                            </ul>
+                        </div>
+                        <div class="p-2.5 bg-cardBg rounded-lg border border-gray-800 text-[11px] text-amber-300">
+                            💡 Tip: Test in 5 seconds first to make sure your phone volume is turned up!
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 5: SAFE VENUES & LIVE LOCATION SHARE -->
+        <section id="tab-map" class="tab-content hidden space-y-4">
+            <div class="bg-cardBg border border-gray-800/80 rounded-2xl p-5 shadow-xl space-y-4 glass-panel">
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-2">
+                    <div>
+                        <h2 class="text-xl font-bold flex items-center gap-2">
+                            📍 Verified Safe Meeting Spots & Live GPS Share
+                        </h2>
+                        <p class="text-xs text-gray-400 mt-1">Choose high-visibility, public locations with easy exits. Share your live location link directly with trusted friends.</p>
+                    </div>
+                    <button onclick="shareLiveLocation()" class="w-full md:w-auto bg-gradient-to-r from-greenFlag to-emerald-600 hover:from-greenFlagDark hover:to-emerald-800 text-darkBg px-4 py-2.5 rounded-xl text-xs font-extrabold flex items-center justify-center gap-2 transition shadow-lg shadow-greenFlag/20">
+                        <span>📡</span> Share My Live Location
+                    </button>
+                </div>
+
+                <div id="safeMap"></div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div class="bg-darkBg p-3.5 rounded-xl border border-gray-800">
+                        <div class="font-bold text-xs text-amber-400">☕ Public Coffee Shops</div>
+                        <div class="text-[11px] text-gray-400 mt-1">High daytime foot traffic, easy exit, low-pressure environment.</div>
+                    </div>
+                    <div class="bg-darkBg p-3.5 rounded-xl border border-gray-800">
+                        <div class="font-bold text-xs text-amber-400">🍽️ Mall & Hotel Lounges</div>
+                        <div class="text-[11px] text-gray-400 mt-1">Security personnel present, clear transit access, well-lit.</div>
+                    </div>
+                    <div class="bg-darkBg p-3.5 rounded-xl border border-gray-800">
+                        <div class="font-bold text-xs text-amber-400">🎨 Museums & Public Parks</div>
+                        <div class="text-[11px] text-gray-400 mt-1">Staffed venues with busy walking areas and open space.</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 6: MATCH VERIFICATION CHECKLIST -->
+        <section id="tab-verifier" class="tab-content hidden space-y-4">
+            <div class="bg-cardBg border border-gray-800/80 rounded-2xl p-5 shadow-xl space-y-4 glass-panel">
+                <div>
+                    <h2 class="text-xl font-bold flex items-center gap-2">
+                        🔎 Pre-Date Match Verification Checklist
+                    </h2>
+                    <p class="text-xs text-gray-400 mt-1">Run these 4 simple verification steps before meeting someone in person to significantly reduce risks.</p>
+                </div>
+
+                <div class="bg-darkBg p-4 rounded-xl border border-gray-800 space-y-2">
+                    <h3 class="font-bold text-xs text-crimson flex items-center justify-between">
+                        <span>Step 1: Reverse Image Search</span>
+                        <input type="checkbox" id="vchk1" onchange="calcVerifyScore()" class="w-4 h-4 accent-crimson">
+                    </h3>
+                    <p class="text-[11px] text-gray-400">Save profile images and run reverse image searches to check for stolen model/influencer photos.</p>
+                    <div class="flex gap-2 pt-1">
+                        <a href="https://lens.google.com" target="_blank" class="bg-cardBg hover:bg-gray-800 text-[11px] px-3 py-1 rounded-lg text-white font-medium border border-gray-800 transition">Google Lens ↗</a>
+                        <a href="https://tineye.com" target="_blank" class="bg-cardBg hover:bg-gray-800 text-[11px] px-3 py-1 rounded-lg text-white font-medium border border-gray-800 transition">TinEye Search ↗</a>
+                    </div>
+                </div>
+
+                <div class="bg-darkBg p-4 rounded-xl border border-gray-800 space-y-2">
+                    <h3 class="font-bold text-xs text-crimson flex items-center justify-between">
+                        <span>Step 2: Social Media & Tagged Footprint</span>
+                        <input type="checkbox" id="vchk2" onchange="calcVerifyScore()" class="w-4 h-4 accent-crimson">
+                    </h3>
+                    <p class="text-[11px] text-gray-400">Verify they have an active profile with tagged posts or friends matching their claimed identity.</p>
+                </div>
+
+                <div class="bg-darkBg p-4 rounded-xl border border-gray-800 space-y-2">
+                    <h3 class="font-bold text-xs text-crimson flex items-center justify-between">
+                        <span>Step 3: 60-Second Video Call Check</span>
+                        <input type="checkbox" id="vchk3" onchange="calcVerifyScore()" class="w-4 h-4 accent-crimson">
+                    </h3>
+                    <p class="text-[11px] text-gray-400">Request a quick 1-minute video chat prior to meeting. Persistent refusal is a critical warning sign.</p>
+                </div>
+
+                <div class="bg-darkBg p-4 rounded-xl border border-gray-800 space-y-2">
+                    <h3 class="font-bold text-xs text-crimson flex items-center justify-between">
+                        <span>Step 4: Independent Transport & Public Venue</span>
+                        <input type="checkbox" id="vchk4" onchange="calcVerifyScore()" class="w-4 h-4 accent-crimson">
+                    </h3>
+                    <p class="text-[11px] text-gray-400">Ensure you meet in a well-populated place and arrange your own transportation to/from the venue.</p>
+                </div>
+
+                <div class="p-4 rounded-xl bg-gray-900 border border-gray-800 flex items-center justify-between">
+                    <div>
+                        <div class="text-xs text-gray-400">Verification Readiness Index:</div>
+                        <div id="verifyScoreText" class="text-xl font-extrabold text-white">0% Verified</div>
+                    </div>
+                    <div id="verifyBadge" class="text-xs px-3.5 py-1.5 rounded-full bg-red-950/80 text-red-300 font-bold border border-red-800">Unverified / High Risk</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 7: SAFETY DIAGNOSTIC QUIZ -->
+        <section id="tab-quiz" class="tab-content hidden space-y-4">
+            <div class="bg-cardBg border border-gray-800/80 rounded-2xl p-5 shadow-xl space-y-4 glass-panel">
+                <div>
+                    <h2 class="text-xl font-bold flex items-center gap-2">
+                        📋 Dating Safety Diagnostic Matrix
+                    </h2>
+                    <p class="text-xs text-gray-400 mt-1">Answer 3 key diagnostic questions to assess potential danger levels for your upcoming date.</p>
+                </div>
+
+                <div id="quizContainer" class="space-y-3">
+                    <div class="quiz-item space-y-2 bg-darkBg p-4 rounded-xl border border-gray-800">
+                        <p class="text-xs font-bold text-white">1. How rapidly did this person express intense emotional attachment or pet names?</p>
+                        <div class="space-y-2 text-[11px]">
+                            <label class="flex items-center space-x-2 bg-cardBg p-2.5 rounded-lg cursor-pointer border border-gray-800/60 hover:border-gray-700">
+                                <input type="radio" name="q1" value="3" class="accent-crimson">
+                                <span>Within hours/days ("You're my soulmate", calling me babe immediately)</span>
+                            </label>
+                            <label class="flex items-center space-x-2 bg-cardBg p-2.5 rounded-lg cursor-pointer border border-gray-800/60 hover:border-gray-700">
+                                <input type="radio" name="q1" value="0" class="accent-crimson">
+                                <span>Gradually over time through normal conversations</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="quiz-item space-y-2 bg-darkBg p-4 rounded-xl border border-gray-800">
+                        <p class="text-xs font-bold text-white">2. Has this person requested financial favors, loans, or crypto tips?</p>
+                        <div class="space-y-2 text-[11px]">
+                            <label class="flex items-center space-x-2 bg-cardBg p-2.5 rounded-lg cursor-pointer border border-gray-800/60 hover:border-gray-700">
+                                <input type="radio" name="q2" value="5" class="accent-crimson">
+                                <span>Yes, claiming an emergency, blocked app, or quick transfer need</span>
+                            </label>
+                            <label class="flex items-center space-x-2 bg-cardBg p-2.5 rounded-lg cursor-pointer border border-gray-800/60 hover:border-gray-700">
+                                <input type="radio" name="q2" value="0" class="accent-crimson">
+                                <span>No, money or loans have never been brought up</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="quiz-item space-y-2 bg-darkBg p-4 rounded-xl border border-gray-800">
+                        <p class="text-xs font-bold text-white">3. What location are they pushing for the first meetup?</p>
+                        <div class="space-y-2 text-[11px]">
+                            <label class="flex items-center space-x-2 bg-cardBg p-2.5 rounded-lg cursor-pointer border border-gray-800/60 hover:border-gray-700">
+                                <input type="radio" name="q3" value="3" class="accent-crimson">
+                                <span>Private home, secluded venue, or offering to pick me up at my house</span>
+                            </label>
+                            <label class="flex items-center space-x-2 bg-cardBg p-2.5 rounded-lg cursor-pointer border border-gray-800/60 hover:border-gray-700">
+                                <input type="radio" name="q3" value="0" class="accent-crimson">
+                                <span>Public coffee shop, restaurant, or well-lit shopping plaza</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <button onclick="calculateQuiz()" class="w-full bg-gradient-to-r from-crimson to-rose-600 hover:from-crimsonDark hover:to-rose-800 text-white font-bold py-3.5 rounded-xl transition shadow-lg shadow-crimson/20 text-xs">
+                        Evaluate Safety Diagnostic
+                    </button>
+                </div>
+
+                <div id="quizResultBox" class="hidden bg-darkBg border border-gray-800 p-4 rounded-xl space-y-2">
+                    <h3 id="quizRiskHeader" class="text-base font-bold text-white">Diagnostic Results</h3>
+                    <p id="quizRiskDesc" class="text-xs text-gray-300 leading-relaxed"></p>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 8: COMMUNITY Q&A BOARD -->
+        <section id="tab-qa" class="tab-content hidden space-y-4">
+            <div class="bg-cardBg border border-gray-800/80 rounded-2xl p-5 shadow-xl space-y-4 glass-panel">
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-2">
+                    <div>
+                        <h2 class="text-xl font-bold flex items-center gap-2">
+                            💬 Anonymous Advice & Community Q&A
+                        </h2>
+                        <p class="text-xs text-gray-400 mt-1">Ask questions about uncertain dating scenarios or share your perspective anonymously.</p>
+                    </div>
+                    <button onclick="openModal('qaModal')" class="bg-crimson hover:bg-crimsonDark text-white px-4 py-2 rounded-xl text-xs font-bold transition shadow-md shadow-crimson/20">
+                        + Ask Question
+                    </button>
+                </div>
+
+                <div id="qaThreadsContainer" class="space-y-3">
+                    <!-- Rendered dynamic -->
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Mobile Bottom Navigation Bar -->
+    <nav class="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#090a0f]/95 backdrop-blur-md border-t border-gray-800/80 px-2 py-1.5 flex justify-around items-center">
+        <button onclick="switchTab('feed')" id="mtab-feed" class="tab-btn-m flex flex-col items-center p-1 text-crimson">
+            <span class="text-base">🚩</span>
+            <span class="text-[9px] font-bold">Feed</span>
+        </button>
+        <button onclick="switchTab('ai')" id="mtab-ai" class="tab-btn-m flex flex-col items-center p-1 text-gray-400">
+            <span class="text-base">🤖</span>
+            <span class="text-[9px] font-bold">AI Scanner</span>
+        </button>
+        <button onclick="switchTab('sos')" id="mtab-sos" class="tab-btn-m flex flex-col items-center p-1 text-gray-400">
+            <span class="text-base">🚨</span>
+            <span class="text-[9px] font-bold">SOS Timer</span>
+        </button>
+        <button onclick="switchTab('fakecall')" id="mtab-fakecall" class="tab-btn-m flex flex-col items-center p-1 text-gray-400">
+            <span class="text-base">📞</span>
+            <span class="text-[9px] font-bold">Fake Call</span>
+        </button>
+        <button onclick="switchTab('map')" id="mtab-map" class="tab-btn-m flex flex-col items-center p-1 text-gray-400">
+            <span class="text-base">📍</span>
+            <span class="text-[9px] font-bold">Safe Map</span>
+        </button>
+        <button onclick="switchTab('verifier')" id="mtab-verifier" class="tab-btn-m flex flex-col items-center p-1 text-gray-400">
+            <span class="text-base">🔎</span>
+            <span class="text-[9px] font-bold">Verifier</span>
+        </button>
+    </nav>
+
+    <!-- FAKE INCOMING CALL MODAL OVERLAY -->
+    <div id="fakeCallScreen" class="hidden fixed inset-0 z-50 bg-black text-white flex flex-col justify-between p-8 text-center select-none">
+        <div class="space-y-4 pt-16">
+            <div class="w-28 h-28 rounded-full bg-gradient-to-tr from-gray-700 to-gray-500 mx-auto flex items-center justify-center text-5xl shadow-2xl ring-4 ring-gray-700 ring-offset-4 ring-offset-black">
+                👤
+            </div>
+            <div>
+                <h2 id="incomingCallerName" class="text-3xl font-extrabold tracking-tight">Mom / Emergency Work</h2>
+                <p id="incomingCallStatus" class="text-sm text-gray-400 mt-1">Incoming Call...</p>
+            </div>
+        </div>
+
+        <!-- Simulated Active Call Audio Visualizer (Hidden initially) -->
+        <div id="callAudioVisualizer" class="hidden space-y-4 py-8">
+            <div class="text-green-400 text-sm font-mono font-bold animate-pulse">00:<span id="callDurationSecs">00</span></div>
+            <div class="p-4 bg-gray-900/80 rounded-2xl border border-gray-800 text-xs text-gray-300 italic">
+                🔊 Simulated Voice: "Hey! There is an urgent issue here and I need you home right now!"
+            </div>
+        </div>
+
+        <div class="flex justify-around items-center pb-16">
+            <button onclick="endFakeCall()" class="w-20 h-20 rounded-full bg-red-600 hover:bg-red-700 flex items-center justify-center text-3xl shadow-xl ring-4 ring-red-500/30 transition">
+                📵
+            </button>
+            <button onclick="acceptFakeCall()" id="acceptCallBtn" class="w-20 h-20 rounded-full bg-green-500 hover:bg-green-600 ring-anim flex items-center justify-center text-3xl shadow-xl ring-4 ring-green-400/30 transition">
+                📞
+            </button>
+        </div>
+    </div>
+
+    <!-- EMERGENCY HELPLINES MODAL -->
+    <div id="hotlinesModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+        <div class="bg-cardBg border border-gray-800 rounded-2xl w-full max-w-md p-5 space-y-4 shadow-2xl">
+            <div class="flex justify-between items-center border-b border-gray-800 pb-3">
+                <h3 class="font-bold text-base text-white flex items-center gap-2">🚨 Emergency Helplines</h3>
+                <button onclick="closeModal('hotlinesModal')" class="text-gray-400 hover:text-white text-base">✕</button>
+            </div>
+            <div class="space-y-2 text-xs">
+                <a href="tel:911" class="flex justify-between items-center p-3.5 rounded-xl bg-red-950/80 border border-red-800 text-red-200 font-bold">
+                    <span>National Emergency Hotline</span>
+                    <span class="bg-red-800 text-white px-2 py-0.5 rounded">Dial 911 ↗</span>
+                </a>
+                <a href="tel:18007997233" class="flex justify-between items-center p-3.5 rounded-xl bg-darkBg border border-gray-800 text-gray-200 font-medium">
+                    <span>National Domestic Violence Hotline</span>
+                    <span>1-800-799-7233 ↗</span>
+                </a>
+                <a href="sms:741741?body=HOME" class="flex justify-between items-center p-3.5 rounded-xl bg-darkBg border border-gray-800 text-gray-200 font-medium">
+                    <span>Crisis Text Line</span>
+                    <span>Text HOME to 741741 ↗</span>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 1: SHARE EXPERIENCE MODAL -->
+    <div id="shareModal" class="hidden fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
+        <div class="bg-cardBg border border-gray-800 rounded-2xl w-full max-w-lg p-5 space-y-4 shadow-2xl my-8 glass-panel">
+            <div class="flex justify-between items-center border-b border-gray-800 pb-3">
+                <h3 class="font-bold text-lg text-white">Share Dating Experience</h3>
+                <button onclick="closeModal('shareModal')" class="text-gray-400 hover:text-white text-lg">✕</button>
+            </div>
+
+            <form id="storyForm" onsubmit="submitStory(event)" class="space-y-3">
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="text-xs text-gray-400 font-medium">Name / Initials</label>
+                        <input type="text" id="postName" required placeholder="e.g. John D." class="w-full mt-1 bg-darkBg border border-gray-800 text-xs rounded-xl p-3 text-white focus:outline-none focus:border-crimson">
+                    </div>
+                    <div>
+                        <label class="text-xs text-gray-400 font-medium">Age Bracket</label>
+                        <select id="postAge" required class="w-full mt-1 bg-darkBg border border-gray-800 text-xs rounded-xl p-3 text-white focus:outline-none focus:border-crimson">
+                            <option value="18–24">18–24</option>
+                            <option value="25–29">25–29</option>
+                            <option value="30–34" selected>30–34</option>
+                            <option value="35–39">35–39</option>
+                            <option value="40–49">40–49</option>
+                            <option value="50+">50+</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="text-xs text-gray-400 font-medium">City / District</label>
+                        <input type="text" id="postCity" required placeholder="e.g. Metro Manila" class="w-full mt-1 bg-darkBg border border-gray-800 text-xs rounded-xl p-3 text-white focus:outline-none focus:border-crimson">
+                    </div>
+                    <div>
+                        <label class="text-xs text-gray-400 font-medium">Dating App</label>
+                        <select id="postApp" required class="w-full mt-1 bg-darkBg border border-gray-800 text-xs rounded-xl p-3 text-white focus:outline-none focus:border-crimson">
+                            <option value="Tinder">Tinder</option>
+                            <option value="Bumble">Bumble</option>
+                            <option value="Hinge">Hinge</option>
+                            <option value="Instagram">Instagram</option>
+                            <option value="Facebook Dating">Facebook Dating</option>
+                            <option value="Grindr">Grindr</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="text-xs text-gray-400 font-medium">Category</label>
+                        <select id="postCategory" required class="w-full mt-1 bg-darkBg border border-gray-800 text-xs rounded-xl p-3 text-white focus:outline-none focus:border-crimson">
+                            <option value="Red Flag">🚩 Red Flag</option>
+                            <option value="Green Flag">🟢 Green Flag</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="text-xs text-gray-400 font-medium">Behavior Tag</label>
+                        <input type="text" id="postTag" required placeholder="e.g. Catfish / Respectful" class="w-full mt-1 bg-darkBg border border-gray-800 text-xs rounded-xl p-3 text-white focus:outline-none focus:border-crimson">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="text-xs text-gray-400 font-medium">Sanitized Story Details</label>
+                    <textarea id="postText" rows="3" required placeholder="Describe what occurred neutrally. Avoid full phone numbers or social handles." class="w-full mt-1 bg-darkBg border border-gray-800 text-xs rounded-xl p-3 text-white focus:outline-none focus:border-crimson"></textarea>
+                </div>
+
+                <button type="submit" class="w-full bg-gradient-to-r from-crimson to-rose-600 hover:from-crimsonDark hover:to-rose-800 text-white font-bold py-3.5 rounded-xl transition shadow-lg shadow-crimson/20 text-xs">
+                    Post Anonymously
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL 2: ASK Q&A MODAL -->
+    <div id="qaModal" class="hidden fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
+        <div class="bg-cardBg border border-gray-800 rounded-2xl w-full max-w-md p-5 space-y-4 shadow-2xl glass-panel">
+            <div class="flex justify-between items-center border-b border-gray-800 pb-3">
+                <h3 class="font-bold text-lg text-white">Ask Community Question</h3>
+                <button onclick="closeModal('qaModal')" class="text-gray-400 hover:text-white text-lg">✕</button>
+            </div>
+
+            <form onsubmit="submitQuestion(event)" class="space-y-3">
+                <div>
+                    <label class="text-xs text-gray-400 font-medium">Question Title</label>
+                    <input type="text" id="qaTitle" required placeholder="e.g. Is it a red flag if they refuse to video call?" class="w-full mt-1 bg-darkBg border border-gray-800 text-xs rounded-xl p-3 text-white focus:outline-none focus:border-crimson">
+                </div>
+                <div>
+                    <label class="text-xs text-gray-400 font-medium">Details / Context</label>
+                    <textarea id="qaText" rows="3" required placeholder="Give a brief background..." class="w-full mt-1 bg-darkBg border border-gray-800 text-xs rounded-xl p-3 text-white focus:outline-none focus:border-crimson"></textarea>
+                </div>
+                <button type="submit" class="w-full bg-crimson hover:bg-crimsonDark text-white font-bold py-3 rounded-xl transition text-xs shadow-md shadow-crimson/20">
+                    Submit Question
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL 3: LEGAL TAKEDOWN MODAL -->
+    <div id="takedownModal" class="hidden fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
+        <div class="bg-cardBg border border-gray-800 rounded-2xl w-full max-w-md p-5 space-y-4 shadow-2xl glass-panel">
+            <div class="flex justify-between items-center border-b border-gray-800 pb-3">
+                <h3 class="font-bold text-lg text-white">Takedown Request</h3>
+                <button onclick="closeModal('takedownModal')" class="text-gray-400 hover:text-white text-lg">✕</button>
+            </div>
+            <p class="text-xs text-gray-300 leading-relaxed">
+                The Red Flag Hub strictly redacts personal information. If you believe a post infringes on privacy rights, submit a dispute.
+            </p>
+            <div class="space-y-2">
+                <input type="text" placeholder="Post ID or initial..." class="w-full bg-darkBg border border-gray-800 text-xs rounded-xl p-3 text-white">
+                <textarea rows="3" placeholder="Reason for removal request..." class="w-full bg-darkBg border border-gray-800 text-xs rounded-xl p-3 text-white"></textarea>
+            </div>
+            <button onclick="submitTakedown()" class="w-full bg-gray-800 hover:bg-gray-700 text-white font-bold py-3 rounded-xl transition text-xs">
+                Submit Dispute Request
+            </button>
+        </div>
+    </div>
+
+    <!-- JAVASCRIPT LOGIC -->
+    <script>
+        const INITIAL_STORIES = [
+            {
+                id: '1',
+                name: 'J*** D**',
+                age: '30–34',
+                city: 'Metro Manila',
+                app: 'Tinder',
+                category: 'Red Flag',
+                tag: 'Financial Catfish',
+                text: 'Claimed his credit card was locked while out at dinner and promised to pay me back immediately via bank transfer. Avoided all calls and blocked me right after leaving.',
+                upvotes: 94,
+                relatableVotes: 48,
+                timestamp: '2 hours ago'
+            },
+            {
+                id: '2',
+                name: 'R*** M**',
+                age: '25–29',
+                city: 'Makati City',
+                app: 'Hinge',
+                category: 'Red Flag',
+                tag: 'Love Bombing',
+                text: 'Sent dozens of flowers and called me "future wife" on day 2. Got extremely hostile and defensive when I asked to slow down before meeting.',
+                upvotes: 68,
+                relatableVotes: 35,
+                timestamp: '3 hours ago'
+            },
+            {
+                id: '3',
+                name: 'M*** S**',
+                age: '25–29',
+                city: 'Quezon City',
+                app: 'Bumble',
+                category: 'Green Flag',
+                tag: 'Respectful Boundaries',
+                text: 'Offered to do a quick video call before our first coffee date. Split the bill easily and made sure I made it home safely via ride-share.',
+                upvotes: 56,
+                relatableVotes: 21,
+                timestamp: '5 hours ago'
+            }
+        ];
+
+        const INITIAL_QA = [
+            {
+                id: 'q1',
+                title: 'How do you politely insist on a video call before meeting?',
+                text: 'I match with people on Tinder but feel nervous meeting in person without a quick video chat first. How do you ask without sounding paranoid?',
+                answers: [
+                    'Just say: "Hey! I always do a quick 2-minute FaceTime before first dates for safety & vibe checks. Super excited to meet you!" If they refuse, that is your answer.'
+                ]
+            }
+        ];
+
+        let stories = JSON.parse(localStorage.getItem('rfh_stories')) || INITIAL_STORIES;
+        let qaList = JSON.parse(localStorage.getItem('rfh_qa')) || INITIAL_QA;
+        let sosInterval = null;
+        let sosRemainingSeconds = 0;
+        let fakeCallTimeout = null;
+        let fakeCallSecsInterval = null;
+        let mapInitialized = false;
+
+        window.onload = function() {
+            renderStories(stories);
+            renderQA();
+            loadSosSettings();
+        };
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.getElementById(`tab-${tabId}`).classList.remove('hidden');
+
+            document.querySelectorAll('.tab-btn-d').forEach(btn => {
+                btn.classList.remove('bg-crimson', 'text-white', 'shadow-lg', 'shadow-crimson/20');
+                btn.classList.add('text-gray-400');
+            });
+            const activeDBtn = document.getElementById(`dtab-${tabId}`);
+            if(activeDBtn) {
+                activeDBtn.classList.add('bg-crimson', 'text-white', 'shadow-lg', 'shadow-crimson/20');
+                activeDBtn.classList.remove('text-gray-400');
+            }
+
+            document.querySelectorAll('.tab-btn-m').forEach(btn => {
+                btn.classList.remove('text-crimson');
+                btn.classList.add('text-gray-400');
+            });
+            const activeMBtn = document.getElementById(`mtab-${tabId}`);
+            if(activeMBtn) {
+                activeMBtn.classList.add('text-crimson');
+                activeMBtn.classList.remove('text-gray-400');
+            }
+
+            if(tabId === 'map' && !mapInitialized) {
+                initMap();
+            }
+        }
+
+        // Map Initialization using Leaflet
+        function initMap() {
+            mapInitialized = true;
+            setTimeout(() => {
+                const map = L.map('safeMap').setView([14.5547, 121.0244], 13);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    maxZoom: 19,
+                    attribution: '© OpenStreetMap'
+                }).addTo(map);
+
+                const safePlaces = [
+                    { name: 'Greenbelt Mall Public Courtyard', lat: 14.5520, lng: 121.0210, type: 'Public Mall' },
+                    { name: 'Starbucks Reserve Busy Hub', lat: 14.5580, lng: 121.0280, type: 'High Traffic Cafe' },
+                    { name: 'BGC Central Park Walkway', lat: 14.5508, lng: 121.0490, type: 'Open Public Park' }
+                ];
+
+                safePlaces.forEach(place => {
+                    L.marker([place.lat, place.lng]).addTo(map)
+                        .bindPopup(`<b>${place.name}</b><br><span style="font-size:11px;color:#10b981;">Verified Safe Spot (${place.type})</span>`);
+                });
+            }, 250);
+        }
+
+        function shareLiveLocation() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(pos => {
+                    const lat = pos.coords.latitude;
+                    const lng = pos.coords.longitude;
+                    const mapUrl = `https://maps.google.com/?q=${lat},${lng}`;
+                    const shareText = `Safety Check-in: Here is my live date location: ${mapUrl}`;
+
+                    if (navigator.share) {
+                        navigator.share({ title: 'My Live Location Safety Check', text: shareText, url: mapUrl });
+                    } else {
+                        navigator.clipboard ? navigator.clipboard.writeText(shareText) : document.execCommand('copy');
+                        alert('Location link copied to clipboard: ' + mapUrl);
+                    }
+                }, () => {
+                    alert('Unable to fetch GPS coordinates. Please enable location permissions.');
+                });
+            } else {
+                alert('Geolocation is not supported by your browser.');
+            }
+        }
+
+        // Fake Call Functions
+        function scheduleFakeCall() {
+            const name = document.getElementById('fakeCallerName').value || 'Mom / Work';
+            const delay = parseInt(document.getElementById('fakeCallDelay').value) * 1000;
+
+            alert(`Fake call scheduled for "${name}" in ${delay / 1000} seconds. Keep your screen active!`);
+
+            fakeCallTimeout = setTimeout(() => {
+                document.getElementById('incomingCallerName').innerText = name;
+                document.getElementById('fakeCallScreen').classList.remove('hidden');
+            }, delay);
+        }
+
+        function endFakeCall() {
+            document.getElementById('fakeCallScreen').classList.add('hidden');
+            document.getElementById('callAudioVisualizer').classList.add('hidden');
+            document.getElementById('acceptCallBtn').classList.remove('hidden');
+            document.getElementById('incomingCallStatus').innerText = 'Incoming Call...';
+            if (fakeCallSecsInterval) clearInterval(fakeCallSecsInterval);
+        }
+
+        function acceptFakeCall() {
+            document.getElementById('incomingCallStatus').innerText = 'Connected - Active Call';
+            document.getElementById('acceptCallBtn').classList.add('hidden');
+            document.getElementById('callAudioVisualizer').classList.remove('hidden');
+
+            let sec = 0;
+            const timerEl = document.getElementById('callDurationSecs');
+            fakeCallSecsInterval = setInterval(() => {
+                sec++;
+                timerEl.innerText = sec < 10 ? `0${sec}` : sec;
+            }, 1000);
+        }
+
+        function insertSampleChat() {
+            document.getElementById('aiInputText').value = "Hey beautiful, I know we matched yesterday but I feel like you're my soulmate. I got into a quick fender bender on my way to pick you up and my banking app is locked. Can you wire $60 for my cab via app?";
+        }
+
+        function sanitizeText(str) {
+            if (!str) return '';
+            let clean = str.replace(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g, '[REDACTED EMAIL]');
+            clean = clean.replace(/(\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/g, '[REDACTED PHONE]');
+            clean = clean.replace(/@[a-zA-Z0-9_]+/g, '[REDACTED HANDLE]');
+            return clean;
+        }
+
+        function maskName(name) {
+            if (!name) return 'A*** N**';
+            const parts = name.trim().split(' ');
+            return parts.map(p => p.charAt(0).toUpperCase() + '***').join(' ');
+        }
+
+        function submitStory(e) {
+            e.preventDefault();
+            const rawName = document.getElementById('postName').value;
+            const age = document.getElementById('postAge').value;
+            const city = document.getElementById('postCity').value;
+            const app = document.getElementById('postApp').value;
+            const category = document.getElementById('postCategory').value;
+            const tag = document.getElementById('postTag').value;
+            const rawText = document.getElementById('postText').value;
+
+            const newStory = {
+                id: Date.now().toString(),
+                name: maskName(rawName),
+                age: age,
+                city: sanitizeText(city),
+                app: app,
+                category: category,
+                tag: sanitizeText(tag),
+                text: sanitizeText(rawText),
+                upvotes: 1,
+                relatableVotes: 1,
+                timestamp: 'Just now'
+            };
+
+            stories.unshift(newStory);
+            localStorage.setItem('rfh_stories', JSON.stringify(stories));
+            renderStories(stories);
+            closeModal('shareModal');
+            document.getElementById('storyForm').reset();
+            alert('Your experience has been sanitized and posted anonymously.');
+        }
+
+        function renderStories(data) {
+            const container = document.getElementById('storiesContainer');
+            document.getElementById('postCountBadge').innerText = `${data.length} Stories`;
+
+            if (data.length === 0) {
+                container.innerHTML = `<div class="text-center py-12 text-gray-500 bg-cardBg rounded-2xl border border-gray-800/80 text-xs">No matching stories found. Try broadening your search filters.</div>`;
+                return;
+            }
+
+            container.innerHTML = data.map(item => {
+                const isRed = item.category === 'Red Flag';
+                const cardClass = isRed ? 'red-flag-card shadow-glow-red/10' : 'green-flag-card shadow-glow-green/10';
+
+                return `
+                    <div class="bg-cardBg border border-gray-800/80 rounded-2xl p-4 shadow-lg space-y-3 transition hover:border-gray-700 ${cardClass}">
+                        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-gray-800/80 pb-2.5">
+                            <div class="flex items-center space-x-2">
+                                <span class="font-mono font-bold text-xs ${isRed ? 'text-crimson' : 'text-greenFlag'}">${item.name}</span>
+                                <span class="text-[10px] bg-gray-800/80 text-gray-300 px-2 py-0.5 rounded-md">${item.age}</span>
+                                <span class="text-[10px] bg-gray-800/80 text-gray-300 px-2 py-0.5 rounded-md">📍 ${item.city}</span>
+                            </div>
+                            <div class="flex items-center space-x-2">
+                                <span class="text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider ${isRed ? 'bg-crimson/20 text-crimson border border-crimson/40' : 'bg-greenFlag/20 text-greenFlag border border-greenFlag/40'}">
+                                    ${isRed ? '🚨 RED FLAG' : '🟢 GREEN FLAG'}
+                                </span>
+                                <span class="text-[10px] bg-darkBg text-gray-400 px-2 py-0.5 rounded-full border border-gray-800">${item.app}</span>
+                            </div>
+                        </div>
+
+                        <div>
+                            <div class="flex items-center gap-2 mb-1">
+                                <span class="text-[11px] font-bold uppercase tracking-wider text-gray-400">Behavior Tag:</span>
+                                <span class="text-xs font-extrabold ${isRed ? 'text-red-400' : 'text-green-400'}">${item.tag}</span>
+                            </div>
+                            <p class="text-xs text-gray-200 leading-relaxed font-normal">${item.text}</p>
+                        </div>
+
+                        <div class="flex flex-wrap justify-between items-center pt-2 border-t border-gray-800/80 text-[11px] text-gray-500 gap-2">
+                            <span>Posted ${item.timestamp}</span>
+                            <div class="flex items-center space-x-2">
+                                <button onclick="voteStory('${item.id}', 'upvotes')" class="flex items-center space-x-1.5 hover:text-white bg-darkBg px-2.5 py-1 rounded-lg border border-gray-800 transition">
+                                    <span>🚩 Important Alert</span>
+                                    <span class="font-bold text-crimson">${item.upvotes}</span>
+                                </button>
+                                <button onclick="voteStory('${item.id}', 'relatableVotes')" class="flex items-center space-x-1.5 hover:text-white bg-darkBg px-2.5 py-1 rounded-lg border border-gray-800 transition">
+                                    <span>👁️ Relatable</span>
+                                    <span class="font-bold text-amber-400">${item.relatableVotes || 0}</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function voteStory(id, field) {
+            const story = stories.find(s => s.id === id);
+            if (story) {
+                story[field] = (story[field] || 0) + 1;
+                localStorage.setItem('rfh_stories', JSON.stringify(stories));
+                applyFilters();
+            }
+        }
+
+        function quickFilterTag(tagName) {
+            document.getElementById('filterType').value = 'Red Flag';
+            document.getElementById('filterName').value = '';
+            document.getElementById('filterCity').value = '';
+            applyFilters();
+        }
+
+        function applyFilters() {
+            const nameVal = document.getElementById('filterName').value.toLowerCase();
+            const cityVal = document.getElementById('filterCity').value.toLowerCase();
+            const ageVal = document.getElementById('filterAge').value;
+            const appVal = document.getElementById('filterPlatform').value;
+            const typeVal = document.getElementById('filterType').value;
+
+            const filtered = stories.filter(item => {
+                const matchName = !nameVal || item.name.toLowerCase().includes(nameVal);
+                const matchCity = !cityVal || item.city.toLowerCase().includes(cityVal);
+                const matchAge = !ageVal || item.age === ageVal;
+                const matchApp = !appVal || (appVal === 'Other' ? (item.app !== 'Tinder' && item.app !== 'Bumble' && item.app !== 'Hinge') : item.app === appVal);
+                const matchType = !typeVal || item.category === typeVal;
+                return matchName && matchCity && matchAge && matchApp && matchType;
+            });
+
+            renderStories(filtered);
+        }
+
+        function analyzeChatLog() {
+            const input = document.getElementById('aiInputText').value.toLowerCase();
+            const resultBox = document.getElementById('aiResultBox');
+            const riskBar = document.getElementById('aiRiskBar');
+            const riskBadge = document.getElementById('aiRiskBadge');
+            const detectedList = document.getElementById('aiDetectedList');
+            const scriptText = document.getElementById('aiScriptText');
+
+            if (!input.trim()) {
+                alert('Please paste a chat snippet to analyze.');
+                return;
+            }
+
+            resultBox.classList.remove('hidden');
+
+            let riskScore = 15;
+            let detected = [];
+            let safeScript = "I prefer to take things slow and verify who I am talking to before proceeding. Let's stick to public places.";
+
+            if (input.includes('money') || input.includes('cash') || input.includes('wire') || input.includes('bank') || input.includes('crypto') || input.includes('card')) {
+                riskScore += 50;
+                detected.push({
+                    title: '🚨 Financial Solicitation Warning',
+                    desc: 'Requests for financial assistance, card locks, or money transfers early on strongly indicate financial scamming.'
+                });
+                safeScript = "I have a strict policy never to transfer funds or share financial details with people I haven't established long-term trust with in person.";
+            }
+
+            if (input.includes('love') || input.includes('soulmate') || input.includes('marry') || input.includes('baby')) {
+                riskScore += 25;
+                detected.push({
+                    title: '⚠️ Love-Bombing Indicator',
+                    desc: 'Excessive affection or premature commitment language is often used to lower your emotional defenses quickly.'
+                });
+            }
+
+            riskScore = Math.min(riskScore, 98);
+            riskBar.style.width = `${riskScore}%`;
+
+            if (riskScore > 60) {
+                riskBadge.innerText = `${riskScore}% HIGH RISK`;
+                riskBadge.className = 'px-3.5 py-1 rounded-full font-bold text-xs bg-crimson text-white shadow-lg shadow-crimson/30';
+            } else {
+                riskBadge.innerText = `${riskScore}% LOW RISK`;
+                riskBadge.className = 'px-3.5 py-1 rounded-full font-bold text-xs bg-greenFlag text-darkBg shadow-lg shadow-greenFlag/30';
+            }
+
+            if (detected.length === 0) {
+                detectedList.innerHTML = `<div class="text-xs text-gray-400 bg-darkBg p-3 rounded-lg border border-gray-800">No severe manipulation patterns detected. Maintain standard precautions.</div>`;
+            } else {
+                detectedList.innerHTML = detected.map(d => `
+                    <div class="bg-darkBg p-3.5 rounded-xl border border-gray-800 space-y-1">
+                        <div class="text-xs font-bold text-crimson">${d.title}</div>
+                        <div class="text-xs text-gray-300 leading-relaxed">${d.desc}</div>
+                    </div>
+                `).join('');
+            }
+
+            scriptText.innerText = `"${safeScript}"`;
+        }
+
+        function copyScript() {
+            const text = document.getElementById('aiScriptText').innerText;
+            navigator.clipboard ? navigator.clipboard.writeText(text) : document.execCommand('copy');
+            alert('Suggested script copied to clipboard!');
+        }
+
+        function loadSosSettings() {
+            document.getElementById('sosContactName').value = localStorage.getItem('rfh_sosName') || '';
+            document.getElementById('sosContactPhone').value = localStorage.getItem('rfh_sosPhone') || '';
+            document.getElementById('sosPin').value = localStorage.getItem('rfh_sosPin') || '';
+        }
+
+        function setSosDuration(minutes) {
+            sosRemainingSeconds = minutes * 60;
+            updateSosTimerDisplay();
+        }
+
+        function updateSosTimerDisplay() {
+            const hrs = Math.floor(sosRemainingSeconds / 3600);
+            const mins = Math.floor((sosRemainingSeconds % 3600) / 60);
+            const secs = sosRemainingSeconds % 60;
+            document.getElementById('sosTimerDisplay').innerText = 
+                `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        function startSosTimer() {
+            const name = document.getElementById('sosContactName').value.trim();
+            const phone = document.getElementById('sosContactPhone').value.trim();
+            const pin = document.getElementById('sosPin').value.trim();
+
+            if (!phone || !pin) {
+                alert('Please configure your emergency contact phone number and secret PIN first.');
+                return;
+            }
+
+            localStorage.setItem('rfh_sosName', name);
+            localStorage.setItem('rfh_sosPhone', phone);
+            localStorage.setItem('rfh_sosPin', pin);
+
+            if (sosRemainingSeconds <= 0) sosRemainingSeconds = 3600;
+
+            document.getElementById('startSosBtn').classList.add('hidden');
+            document.getElementById('cancelSosBtn').classList.remove('hidden');
+
+            sosInterval = setInterval(() => {
+                sosRemainingSeconds--;
+                updateSosTimerDisplay();
+                if (sosRemainingSeconds <= 0) {
+                    clearInterval(sosInterval);
+                    triggerImmediateSOS();
+                }
+            }, 1000);
+
+            alert('Date SOS Protection active! Keep your secret PIN handy.');
+        }
+
+        function promptSosCancel() {
+            const userPin = prompt('Enter your 4-digit PIN to deactivate SOS timer:');
+            const savedPin = localStorage.getItem('rfh_sosPin');
+            if (userPin === savedPin) {
+                clearInterval(sosInterval);
+                sosRemainingSeconds = 0;
+                updateSosTimerDisplay();
+                document.getElementById('startSosBtn').classList.remove('hidden');
+                document.getElementById('cancelSosBtn').classList.add('hidden');
+                alert('SOS Timer successfully deactivated.');
+            } else {
+                alert('Incorrect PIN!');
+            }
+        }
+
+        function triggerImmediateSOS() {
+            const phone = localStorage.getItem('rfh_sosPhone') || document.getElementById('sosContactPhone').value;
+            const message = encodeURIComponent("EMERGENCY DATE CHECK-IN ALERT: My Red Flag Hub safety timer expired. Please call or check on my location immediately!");
+            window.open(`https://wa.me/${phone.replace(/[^0-9]/g, '')}?text=${message}`, '_blank');
+        }
+
+        function calcVerifyScore() {
+            const c1 = document.getElementById('vchk1').checked;
+            const c2 = document.getElementById('vchk2').checked;
+            const c3 = document.getElementById('vchk3').checked;
+            const c4 = document.getElementById('vchk4').checked;
+
+            let score = [c1, c2, c3, c4].filter(Boolean).length * 25;
+
+            const textEl = document.getElementById('verifyScoreText');
+            const badgeEl = document.getElementById('verifyBadge');
+
+            textEl.innerText = `${score}% Verified`;
+
+            if (score === 100) {
+                badgeEl.innerText = 'High Safety / Verified';
+                badgeEl.className = 'text-xs px-3.5 py-1.5 rounded-full bg-greenFlag/20 text-greenFlag font-bold border border-greenFlag/40';
+            } else {
+                badgeEl.innerText = 'Unverified / High Risk';
+                badgeEl.className = 'text-xs px-3.5 py-1.5 rounded-full bg-crimson/20 text-crimson font-bold border border-crimson/40';
+            }
+        }
+
+        function calculateQuiz() {
+            const q1 = document.querySelector('input[name="q1"]:checked');
+            const q2 = document.querySelector('input[name="q2"]:checked');
+            const q3 = document.querySelector('input[name="q3"]:checked');
+
+            if (!q1 || !q2 || !q3) {
+                alert('Please answer all diagnostic questions.');
+                return;
+            }
+
+            let total = parseInt(q1.value) + parseInt(q2.value) + parseInt(q3.value);
+            const box = document.getElementById('quizResultBox');
+            const header = document.getElementById('quizRiskHeader');
+            const desc = document.getElementById('quizRiskDesc');
+
+            box.classList.remove('hidden');
+
+            if (total >= 5) {
+                header.innerText = '⚠️ High Danger / Red Flags Present';
+                header.className = 'text-base font-bold text-crimson';
+                desc.innerText = 'Your responses indicate multiple classic danger signals (e.g. financial requests, love bombing). We recommend halting face-to-face meetings.';
+            } else {
+                header.innerText = '🟢 Low Initial Risk';
+                header.className = 'text-base font-bold text-greenFlag';
+                desc.innerText = 'Your match displays normal dating pacing. Continue following standard safety precautions.';
+            }
+        }
+
+        function renderQA() {
+            const container = document.getElementById('qaThreadsContainer');
+            container.innerHTML = qaList.map(q => `
+                <div class="bg-darkBg border border-gray-800 rounded-xl p-4 space-y-2.5">
+                    <h3 class="font-bold text-xs text-white">${q.title}</h3>
+                    <p class="text-[11px] text-gray-300 leading-relaxed">${q.text}</p>
+                    <div class="space-y-2 pt-2 border-t border-gray-800">
+                        <div class="text-[10px] font-bold text-crimson uppercase tracking-wider">Community Answers (${q.answers.length})</div>
+                        ${q.answers.map(ans => `<div class="bg-cardBg p-2.5 rounded-lg text-xs text-gray-300 border border-gray-800">💬 ${ans}</div>`).join('')}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function submitQuestion(e) {
+            e.preventDefault();
+            const title = document.getElementById('qaTitle').value;
+            const text = document.getElementById('qaText').value;
+
+            qaList.unshift({
+                id: Date.now().toString(),
+                title: sanitizeText(title),
+                text: sanitizeText(text),
+                answers: []
+            });
+
+            localStorage.setItem('rfh_qa', JSON.stringify(qaList));
+            renderQA();
+            closeModal('qaModal');
+            alert('Your question has been posted!');
+        }
+
+        function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
+        function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+        function dismissBanner() { document.getElementById('pwaBanner').style.display = 'none'; }
+        function installPWA() { alert('To install: Tap Share -> Add to Home Screen on iOS, or Browser Menu -> Add to Home Screen on Android.'); }
+        function submitTakedown() { alert('Takedown request received and queued for review.'); closeModal('takedownModal'); }
+    </script>
+</body>
+</html>
